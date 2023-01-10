@@ -5,7 +5,7 @@ pub fn build(b: *std.build.Builder) void {
     // Check minimum zig version
     comptime {
         const current_zig = builtin.zig_version;
-        const min_zig = std.SemanticVersion.parse("0.10.0") catch unreachable;
+        const min_zig = std.SemanticVersion.parse("0.11.0-dev.1239+7a2d7ff62") catch unreachable;
         if (current_zig.order(min_zig) == .lt) {
             @compileError(std.fmt.comptimePrint(
                 "Your Zig version v{} does not meet the minimum build requirement of v{}",
@@ -14,22 +14,19 @@ pub fn build(b: *std.build.Builder) void {
         }
     }
 
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
+    const strip = b.option(bool, "strip", "Removes symbols and sections from file") orelse false;
 
     const exe = b.addExecutable("ztags", "src/main.zig");
+    exe.override_dest_dir = .{ .custom = "./" };
+    exe.strip = strip;
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
 
     const run_cmd = exe.run();
+    run_cmd.expected_exit_code = null;
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);
