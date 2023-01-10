@@ -26,6 +26,7 @@ let g:tagbar_type_zig = {
         \'enum:enum:1',
         \'union:union:1',
         \'struct:struct:1',
+        \'opaque:opaque:1',
         \'function:function',
         \'test:test',
     \ ],
@@ -34,6 +35,7 @@ let g:tagbar_type_zig = {
         \ 'enum' : 'enum',
         \ 'union' : 'union',
         \ 'struct' : 'struct',
+        \ 'opaque' : 'opaque',
     \ },
     \ 'ctagsbin' : 'ztags',
     \ 'ctagsargs' : ''
