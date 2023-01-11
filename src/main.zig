@@ -104,12 +104,17 @@ fn printTags(index: Node.Index) !void {
 
         .container_field_init => try printLine(main_token, "field"),
 
-        .fn_decl => try printLine(main_token + 1, "function"),
+        .fn_proto_simple,
+        .fn_proto_multi,
+        .fn_proto_one,
+        .fn_proto,
+        .fn_decl,
+        => try printLine(main_token + 1, "function"),
 
         .test_decl => try printLine(if (data.lhs > 0) data.lhs else main_token, "test"),
 
-        else => |unknown_tag| std.debug.print(
-            "unknown: \x1b[33m{s}\x1b[m\n",
+        else => |unknown_tag| std.log.debug(
+            "unknown: \x1b[33m{s}\x1b[m",
             .{@tagName(unknown_tag)},
         ),
     }
