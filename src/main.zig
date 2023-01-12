@@ -70,7 +70,10 @@ fn printTags(index: Node.Index) !void {
                 .container_decl_trailing,
                 => {
                     // const a = `struct {}`, `union {}`, `enum {}` or `opaque {}`
-                    try printLine(main_token + 1, ast.tokenSlice(init_node_token));
+                    try printLine(.{
+                        .tag = main_token + 1,
+                        .kind = ast.tokenSlice(init_node_token),
+                    });
 
                     try stack.append(.{
                         .kind = ast.tokenSlice(init_node_token),
@@ -98,20 +101,42 @@ fn printTags(index: Node.Index) !void {
                 },
 
                 // `var` or `const`
-                else => try printLine(main_token + 1, ast.tokenSlice(main_token)),
+                else => {
+                    const full = ast.fullVarDecl(index).?;
+                    try printLine(.{
+                        .tag = main_token + 1,
+                        .kind = ast.tokenSlice(main_token),
+                        .public = if (full.visib_token) |_| true else false,
+                    });
+                },
             }
         },
 
-        .container_field_init => try printLine(main_token, "field"),
+        .container_field_init => try printLine(.{
+            .tag = main_token,
+            .kind = "field",
+        }),
 
         .fn_proto_simple,
         .fn_proto_multi,
         .fn_proto_one,
         .fn_proto,
         .fn_decl,
-        => try printLine(main_token + 1, "function"),
+        => {
+            var buf: [1]Ast.Node.Index = undefined;
+            const full = ast.fullFnProto(&buf, index).?;
 
-        .test_decl => try printLine(if (data.lhs > 0) data.lhs else main_token, "test"),
+            try printLine(.{
+                .tag = main_token + 1,
+                .kind = "function",
+                .public = if (full.visib_token) |_| true else false,
+            });
+        },
+
+        .test_decl => try printLine(.{
+            .tag = if (data.lhs > 0) data.lhs else main_token,
+            .kind = "test",
+        }),
 
         else => |unknown_tag| std.log.debug(
             "unknown: \x1b[33m{s}\x1b[m",
@@ -120,15 +145,19 @@ fn printTags(index: Node.Index) !void {
     }
 }
 
-fn printLine(tag: Ast.TokenIndex, kind: []const u8) !void {
-    const loc = ast.tokenLocation(0, tag);
+fn printLine(info: struct {
+    tag: Ast.TokenIndex,
+    kind: []const u8,
+    public: bool = false,
+}) !void {
+    const loc = ast.tokenLocation(0, info.tag);
     try writer.print(
         "{s}\t{s}\t{};\"\t{s}\tline:{}\tcolumn:{}",
         .{
-            ast.tokenSlice(tag),
+            ast.tokenSlice(info.tag),
             filename,
             loc.line + 1,
-            kind,
+            info.kind,
             loc.line + 1,
             loc.column + 1,
         },
@@ -142,6 +171,10 @@ fn printLine(tag: Ast.TokenIndex, kind: []const u8) !void {
         for (stack.items[1..]) |scope| {
             try writer.print(".{s}", .{scope.scope});
         }
+    }
+
+    if (info.public) {
+        try writer.writeAll("\taccess:public");
     }
 
     try writer.writeByte('\n');
