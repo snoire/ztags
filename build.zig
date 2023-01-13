@@ -5,7 +5,7 @@ pub fn build(b: *std.build.Builder) void {
     // Check minimum zig version
     comptime {
         const current_zig = builtin.zig_version;
-        const min_zig = std.SemanticVersion.parse("0.11.0-dev.1239+7a2d7ff62") catch unreachable;
+        const min_zig = std.SemanticVersion.parse("0.11.0-dev.1280+4b3291764") catch unreachable;
         if (current_zig.order(min_zig) == .lt) {
             @compileError(std.fmt.comptimePrint(
                 "Your Zig version v{} does not meet the minimum build requirement of v{}",

@@ -63,6 +63,8 @@ fn printTags(index: Node.Index) !void {
             const init_node_token = ast.nodes.items(.main_token)[data.rhs];
             const init_node_data = ast.nodes.items(.data)[data.rhs];
 
+            const public = if (ast.fullVarDecl(index).?.visib_token) |_| true else false;
+
             switch (init_node_tag) {
                 .container_decl_two,
                 .container_decl_two_trailing,
@@ -73,6 +75,7 @@ fn printTags(index: Node.Index) !void {
                     try printLine(.{
                         .tag = main_token + 1,
                         .kind = ast.tokenSlice(init_node_token),
+                        .public = public,
                     });
 
                     try stack.append(.{
@@ -102,11 +105,10 @@ fn printTags(index: Node.Index) !void {
 
                 // `var` or `const`
                 else => {
-                    const full = ast.fullVarDecl(index).?;
                     try printLine(.{
                         .tag = main_token + 1,
                         .kind = ast.tokenSlice(main_token),
-                        .public = if (full.visib_token) |_| true else false,
+                        .public = public,
                     });
                 },
             }
@@ -123,7 +125,7 @@ fn printTags(index: Node.Index) !void {
         .fn_proto,
         .fn_decl,
         => {
-            var buf: [1]Ast.Node.Index = undefined;
+            var buf: [1]Node.Index = undefined;
             const full = ast.fullFnProto(&buf, index).?;
 
             try printLine(.{
