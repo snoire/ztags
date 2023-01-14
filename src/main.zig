@@ -70,6 +70,14 @@ fn printTags(index: Node.Index) !void {
                 .container_decl_two_trailing,
                 .container_decl,
                 .container_decl_trailing,
+                .container_decl_arg,
+                .container_decl_arg_trailing,
+                .tagged_union_two,
+                .tagged_union_two_trailing,
+                .tagged_union,
+                .tagged_union_trailing,
+                .tagged_union_enum_tag,
+                .tagged_union_enum_tag_trailing,
                 => {
                     // const a = `struct {}`, `union {}`, `enum {}` or `opaque {}`
                     try printLine(.{
@@ -88,14 +96,28 @@ fn printTags(index: Node.Index) !void {
                     switch (init_node_tag) {
                         .container_decl_two,
                         .container_decl_two_trailing,
+                        .tagged_union_two,
+                        .tagged_union_two_trailing,
                         => {
                             if (init_node_data.lhs > 0) try printTags(init_node_data.lhs);
                             if (init_node_data.rhs > 0) try printTags(init_node_data.rhs);
                         },
                         .container_decl,
                         .container_decl_trailing,
+                        .tagged_union,
+                        .tagged_union_trailing,
                         => {
                             for (ast.extra_data[init_node_data.lhs..init_node_data.rhs]) |member| {
+                                try printTags(member);
+                            }
+                        },
+                        .container_decl_arg,
+                        .container_decl_arg_trailing,
+                        .tagged_union_enum_tag,
+                        .tagged_union_enum_tag_trailing,
+                        => {
+                            const params = ast.extraData(init_node_data.rhs, Node.SubRange);
+                            for (ast.extra_data[params.start..params.end]) |member| {
                                 try printTags(member);
                             }
                         },
