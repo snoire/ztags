@@ -125,6 +125,14 @@ fn printTags(index: Node.Index) !void {
                     }
                 },
 
+                .error_set_decl => {
+                    try printLine(.{
+                        .tag = main_token + 1,
+                        .kind = "error",
+                        .public = public,
+                    });
+                },
+
                 // `var` or `const`
                 else => {
                     try printLine(.{

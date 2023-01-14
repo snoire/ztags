@@ -23,6 +23,7 @@ let g:tagbar_type_zig = {
         \'const:constant',
         \'var:variable',
         \'field:field',
+        \'error:error',
         \'enum:enum:1',
         \'union:union:1',
         \'struct:struct:1',
