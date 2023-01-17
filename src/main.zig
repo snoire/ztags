@@ -68,7 +68,9 @@ fn printTags(index: Node.Index) !void {
             } else {
                 const init_node_tag = ast.nodes.items(.tag)[init_node];
                 switch (init_node_tag) {
-                    .error_set_decl => {
+                    .error_set_decl,
+                    .merge_error_sets,
+                    => {
                         try printLine(.{
                             .tag = main_token + 1,
                             .kind = "error",
