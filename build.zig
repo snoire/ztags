@@ -1,11 +1,11 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     // Check minimum zig version
     comptime {
         const current_zig = builtin.zig_version;
-        const min_zig = std.SemanticVersion.parse("0.11.0-dev.1280+4b3291764") catch unreachable;
+        const min_zig = std.SemanticVersion.parse("0.11.0-dev.1568") catch unreachable;
         if (current_zig.order(min_zig) == .lt) {
             @compileError(std.fmt.comptimePrint(
                 "Your Zig version v{} does not meet the minimum build requirement of v{}",
@@ -15,14 +15,18 @@ pub fn build(b: *std.build.Builder) void {
     }
 
     const target = b.standardTargetOptions(.{});
-    const mode = b.standardReleaseOptions();
+    const optimize = b.standardOptimizeOption(.{});
     const strip = b.option(bool, "strip", "Removes symbols and sections from file") orelse false;
 
-    const exe = b.addExecutable("ztags", "src/main.zig");
+    const exe = b.addExecutable(.{
+        .name = "ztags",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
     exe.override_dest_dir = .{ .custom = "./" };
     exe.strip = strip;
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
     exe.install();
 
     const run_cmd = exe.run();
@@ -35,9 +39,11 @@ pub fn build(b: *std.build.Builder) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const exe_tests = b.addTest("src/main.zig");
-    exe_tests.setTarget(target);
-    exe_tests.setBuildMode(mode);
+    const exe_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);

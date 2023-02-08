@@ -36,7 +36,7 @@ pub fn main() anyerror!void {
     );
     defer allocator.free(source);
 
-    ast = try std.zig.parse(allocator, source);
+    ast = try std.zig.Ast.parse(allocator, source, .zig);
     defer ast.deinit(allocator);
 
     stack = ScopeList.init(allocator);
