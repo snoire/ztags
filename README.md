@@ -7,7 +7,7 @@ ztags for [tagbar](https://github.com/preservim/tagbar)
 ## How to build
 
 ```sh
-$ zig build -Drelease-safe
+$ zig build -Doptimize=ReleaseSafe
 ```
 
 
