@@ -20,6 +20,7 @@ Add `ztags` to your `PATH` and put the following configuration to your `.vimrc`.
 let g:tagbar_type_zig = {
     \ 'ctagstype': 'zig',
     \ 'kinds' : [
+        \'import:import',
         \'const:constant',
         \'var:variable',
         \'field:field',

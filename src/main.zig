@@ -36,7 +36,7 @@ pub fn main() anyerror!void {
     );
     defer allocator.free(source);
 
-    ast = try std.zig.Ast.parse(allocator, source, .zig);
+    ast = try Ast.parse(allocator, source, .zig);
     defer ast.deinit(allocator);
 
     stack = ScopeList.init(allocator);
@@ -59,35 +59,49 @@ fn printTags(index: Node.Index) !void {
             }
         },
 
-        .simple_var_decl => {
+        .simple_var_decl => var_decl: {
             const init_node = data.rhs;
             const public = if (ast.fullVarDecl(index).?.visib_token) |_| true else false;
 
             if (isContainer(init_node)) {
                 try printContainer(main_token + 1, init_node, public);
-            } else {
-                const init_node_tag = ast.nodes.items(.tag)[init_node];
-                switch (init_node_tag) {
-                    .error_set_decl,
-                    .merge_error_sets,
-                    => {
-                        try printLine(.{
-                            .tag = main_token + 1,
-                            .kind = "error",
-                            .public = public,
-                        });
-                    },
-
-                    // `var` or `const`
-                    else => {
-                        try printLine(.{
-                            .tag = main_token + 1,
-                            .kind = ast.tokenSlice(main_token),
-                            .public = public,
-                        });
-                    },
-                }
+                break :var_decl;
             }
+
+            const init_node_tag = ast.nodes.items(.tag)[init_node];
+            switch (init_node_tag) {
+                .error_set_decl,
+                .merge_error_sets,
+                => {
+                    try printLine(.{
+                        .tag = main_token + 1,
+                        .kind = "error",
+                        .public = public,
+                    });
+                    break :var_decl;
+                },
+
+                .builtin_call_two => {
+                    const init_node_main_token = ast.nodes.items(.main_token)[init_node];
+                    if (std.mem.eql(u8, ast.tokenSlice(init_node_main_token), "@import")) {
+                        try printLine(.{
+                            .tag = main_token + 1,
+                            .kind = "import",
+                            .public = public,
+                        });
+                        break :var_decl;
+                    }
+                },
+
+                else => {},
+            }
+
+            // `var` or `const`
+            try printLine(.{
+                .tag = main_token + 1,
+                .kind = ast.tokenSlice(main_token),
+                .public = public,
+            });
         },
 
         .fn_proto_simple,
@@ -95,7 +109,7 @@ fn printTags(index: Node.Index) !void {
         .fn_proto_one,
         .fn_proto,
         .fn_decl,
-        => {
+        => fn_decl: {
             var buf: [1]Node.Index = undefined;
             const full = ast.fullFnProto(&buf, index).?;
             const public = if (full.visib_token) |_| true else false;
@@ -139,13 +153,14 @@ fn printTags(index: Node.Index) !void {
 
             if (container_node) |container| {
                 try printContainer(main_token + 1, container, public);
-            } else {
-                try printLine(.{
-                    .tag = main_token + 1,
-                    .kind = "function",
-                    .public = public,
-                });
+                break :fn_decl;
             }
+
+            try printLine(.{
+                .tag = main_token + 1,
+                .kind = "function",
+                .public = public,
+            });
         },
 
         .container_field_init => try printLine(.{
