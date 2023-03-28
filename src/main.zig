@@ -9,8 +9,10 @@ const Error = std.os.WriteError || error{OutOfMemory};
 
 var ast: Ast = undefined;
 var stack: ScopeList = undefined;
-var writer: std.fs.File.Writer = undefined;
 var filename: []const u8 = undefined;
+
+const stdout_file = std.io.getStdOut().writer();
+var writer: std.io.BufferedWriter(4096, @TypeOf(stdout_file)).Writer = undefined;
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -42,8 +44,11 @@ pub fn main() anyerror!void {
     stack = ScopeList.init(allocator);
     defer stack.deinit();
 
-    writer = std.io.getStdOut().writer();
+    var bw = std.io.bufferedWriter(stdout_file);
+    writer = bw.writer();
+
     try printTags(0); // print root node of Ast
+    try bw.flush();
 }
 
 fn printTags(index: Node.Index) !void {
