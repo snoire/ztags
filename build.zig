@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     // Check minimum zig version
     comptime {
         const current_zig = builtin.zig_version;
-        const min_zig = std.SemanticVersion.parse("0.11.0-dev.2160") catch unreachable;
+        const min_zig = std.SemanticVersion.parse("0.11.0") catch unreachable;
         if (current_zig.order(min_zig) == .lt) {
             @compileError(std.fmt.comptimePrint(
                 "Your Zig version v{} does not meet the minimum build requirement of v{}",
@@ -25,11 +25,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe.override_dest_dir = .{ .custom = "./" };
     exe.strip = strip;
-    exe.install();
+    b.installArtifact(exe);
 
-    const run_cmd = exe.run();
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);
