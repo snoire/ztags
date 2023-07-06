@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = std.mem;
 const Ast = std.zig.Ast;
 const Node = Ast.Node;
 const ScopeList = std.ArrayList(struct {
@@ -14,11 +15,13 @@ var filename: []const u8 = undefined;
 const stdout_file = std.io.getStdOut().writer();
 var writer: std.io.BufferedWriter(4096, @TypeOf(stdout_file)).Writer = undefined;
 
+var allocator: mem.Allocator = undefined;
+
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    const allocator = gpa.allocator();
+    allocator = gpa.allocator();
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
@@ -64,12 +67,16 @@ fn printTags(index: Node.Index) !void {
             }
         },
 
-        .simple_var_decl => var_decl: {
+        .global_var_decl,
+        .local_var_decl,
+        .simple_var_decl,
+        .aligned_var_decl,
+        => var_decl: {
             const init_node = data.rhs;
             const public = if (ast.fullVarDecl(index).?.visib_token) |_| true else false;
 
             if (isContainer(init_node)) {
-                try printContainer(main_token + 1, init_node, public);
+                try printContainer(main_token + 1, init_node, public, null);
                 break :var_decl;
             }
 
@@ -88,7 +95,7 @@ fn printTags(index: Node.Index) !void {
 
                 .builtin_call_two => {
                     const init_node_main_token = ast.nodes.items(.main_token)[init_node];
-                    if (std.mem.eql(u8, ast.tokenSlice(init_node_main_token), "@import")) {
+                    if (mem.eql(u8, ast.tokenSlice(init_node_main_token), "@import")) {
                         try printLine(.{
                             .tag = main_token + 1,
                             .kind = "import",
@@ -109,20 +116,37 @@ fn printTags(index: Node.Index) !void {
             });
         },
 
-        .fn_proto_simple,
-        .fn_proto_multi,
-        .fn_proto_one,
-        .fn_proto,
-        .fn_decl,
-        => fn_decl: {
+        .fn_decl => fn_decl: {
             var buf: [1]Node.Index = undefined;
             const full = ast.fullFnProto(&buf, index).?;
             const public = if (full.visib_token) |_| true else false;
 
+            // get function signature
+            const l_paren = full.lparen;
+            const r_paren = blk: {
+                var n: isize = 0;
+                const token_tags = ast.tokens.items(.tag);
+
+                break :blk for (token_tags[l_paren + 1 ..], l_paren + 1..) |token, i| {
+                    switch (token) {
+                        .l_paren => n += 1,
+                        .r_paren => {
+                            n -= 1;
+                            if (n < 0) break i;
+                        },
+                        else => {},
+                    }
+                } else unreachable;
+            };
+
+            const token_starts = ast.tokens.items(.start);
+            const l_start = token_starts[l_paren];
+            const r_start = token_starts[r_paren];
+            const signature = ast.source[l_start + 1 .. r_start];
+
             // a function may return a struct
             const container_node: ?Node.Index = blk: {
                 const return_type_main_token = ast.nodes.items(.main_token)[full.ast.return_type];
-
                 if (std.mem.eql(u8, ast.tokenSlice(return_type_main_token), "type")) {
                     const block_node = data.rhs;
                     const block_node_tag = ast.nodes.items(.tag)[block_node];
@@ -157,7 +181,7 @@ fn printTags(index: Node.Index) !void {
             };
 
             if (container_node) |container| {
-                try printContainer(main_token + 1, container, public);
+                try printContainer(main_token + 1, container, public, signature);
                 break :fn_decl;
             }
 
@@ -165,6 +189,7 @@ fn printTags(index: Node.Index) !void {
                 .tag = main_token + 1,
                 .kind = "function",
                 .public = public,
+                .signature = signature,
             });
         },
 
@@ -206,7 +231,12 @@ fn isContainer(node: Node.Index) bool {
     };
 }
 
-fn printContainer(tag: Ast.TokenIndex, container: Node.Index, public: bool) Error!void {
+fn printContainer(
+    tag: Ast.TokenIndex,
+    container: Node.Index,
+    public: bool,
+    signature: ?[]const u8,
+) Error!void {
     const container_tag = ast.nodes.items(.tag)[container];
     const container_token = ast.nodes.items(.main_token)[container];
     const container_data = ast.nodes.items(.data)[container];
@@ -216,6 +246,7 @@ fn printContainer(tag: Ast.TokenIndex, container: Node.Index, public: bool) Erro
         .tag = tag,
         .kind = ast.tokenSlice(container_token),
         .public = public,
+        .signature = signature,
     });
 
     try stack.append(.{
@@ -260,7 +291,8 @@ fn printLine(info: struct {
     tag: Ast.TokenIndex,
     kind: []const u8,
     public: bool = false,
-}) std.os.WriteError!void {
+    signature: ?[]const u8 = null,
+}) !void {
     const loc = ast.tokenLocation(0, info.tag);
     try writer.print(
         "{s}\t{s}\t{};\"\t{s}\tline:{}\tcolumn:{}",
@@ -286,6 +318,23 @@ fn printLine(info: struct {
 
     if (info.public) {
         try writer.writeAll("\taccess:public");
+    }
+
+    if (info.signature) |signature| {
+        var buffer = try std.ArrayList(u8).initCapacity(allocator, signature.len);
+        defer buffer.deinit();
+        const bw = buffer.writer();
+
+        var it = mem.tokenizeScalar(u8, signature, '\n');
+        while (it.next()) |line| {
+            const line1 = mem.trim(u8, line, &std.ascii.whitespace);
+            const end = mem.indexOf(u8, line1, "//") orelse line1.len;
+            if (end == 0) continue;
+            const line2 = mem.trimRight(u8, line1[0..end], &std.ascii.whitespace);
+
+            try bw.print("{s} ", .{line2});
+        }
+        try writer.print("\tsignature: ({s})", .{mem.trimRight(u8, buffer.items, ", ")});
     }
 
     try writer.writeByte('\n');
