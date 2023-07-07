@@ -203,6 +203,11 @@ fn printTags(index: Node.Index) !void {
             .kind = "test",
         }),
 
+        .@"comptime" => try printLine(.{
+            .tag = main_token,
+            .kind = "comptime",
+        }),
+
         else => |unknown_tag| std.log.debug(
             "unknown: \x1b[33m{s}\x1b[m",
             .{@tagName(unknown_tag)},
@@ -294,15 +299,20 @@ fn printLine(info: struct {
     signature: ?[]const u8 = null,
 }) !void {
     const loc = ast.tokenLocation(0, info.tag);
+
+    if (mem.eql(u8, info.kind, "comptime")) {
+        try writer.print("comptime_{}", .{loc.line + 1});
+    } else {
+        try writer.print("{s}", .{ast.tokenSlice(info.tag)});
+    }
+
     try writer.print(
-        "{s}\t{s}\t{};\"\t{s}\tline:{}\tcolumn:{}",
+        "\t{[file]s}\t{[line]};\"\t{[kind]s}\tline:{[line]}\tcolumn:{[column]}",
         .{
-            ast.tokenSlice(info.tag),
-            filename,
-            loc.line + 1,
-            info.kind,
-            loc.line + 1,
-            loc.column + 1,
+            .file = filename,
+            .kind = info.kind,
+            .line = loc.line + 1,
+            .column = loc.column + 1,
         },
     );
 
