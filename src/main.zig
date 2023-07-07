@@ -147,34 +147,28 @@ fn printTags(index: Node.Index) !void {
             // a function may return a struct
             const container_node: ?Node.Index = blk: {
                 const return_type_main_token = ast.nodes.items(.main_token)[full.ast.return_type];
-                if (std.mem.eql(u8, ast.tokenSlice(return_type_main_token), "type")) {
-                    const block_node = data.rhs;
-                    const block_node_tag = ast.nodes.items(.tag)[block_node];
-                    const block_node_data = ast.nodes.items(.data)[block_node];
 
-                    const statements: []const Node.Index = switch (block_node_tag) {
+                if (std.mem.eql(u8, ast.tokenSlice(return_type_main_token), "type")) {
+                    const block_node = ast.nodes.get(data.rhs);
+
+                    const statements: []const Node.Index = switch (block_node.tag) {
                         .block_two,
                         .block_two_semicolon,
-                        => &.{ block_node_data.lhs, block_node_data.rhs },
+                        => if (block_node.data.rhs == 0)
+                            &.{block_node.data.lhs}
+                        else
+                            &.{ block_node.data.lhs, block_node.data.rhs },
 
                         .block,
                         .block_semicolon,
-                        => ast.extra_data[block_node_data.lhs..block_node_data.rhs],
+                        => ast.extra_data[block_node.data.lhs..block_node.data.rhs],
 
                         else => unreachable,
                     };
 
-                    for (statements) |statement| {
-                        if (statement == 0) continue;
-
-                        const statement_tag = ast.nodes.items(.tag)[statement];
-                        if (statement_tag == .@"return") {
-                            const statement_data = ast.nodes.items(.data)[statement];
-
-                            if (isContainer(statement_data.lhs)) {
-                                break :blk statement_data.lhs;
-                            }
-                        }
+                    const last_statement = ast.nodes.get(statements[statements.len - 1]);
+                    if (last_statement.tag == .@"return" and isContainer(last_statement.data.lhs)) {
+                        break :blk last_statement.data.lhs;
                     }
                 }
                 break :blk null;
@@ -245,17 +239,18 @@ fn printContainer(
     const container_tag = ast.nodes.items(.tag)[container];
     const container_token = ast.nodes.items(.main_token)[container];
     const container_data = ast.nodes.items(.data)[container];
+    const kind = ast.tokenSlice(container_token);
 
     // const A = `struct {}`, `union {}`, `enum {}` or `opaque {}`
     try printLine(.{
         .tag = tag,
-        .kind = ast.tokenSlice(container_token),
+        .kind = kind,
         .public = public,
         .signature = signature,
     });
 
     try stack.append(.{
-        .kind = ast.tokenSlice(container_token),
+        .kind = kind,
         .scope = ast.tokenSlice(tag),
     });
     defer _ = stack.pop();
@@ -266,7 +261,12 @@ fn printContainer(
         .container_decl_two_trailing,
         .tagged_union_two,
         .tagged_union_two_trailing,
-        => &.{ container_data.lhs, container_data.rhs },
+        => if (container_data.lhs == 0)
+            &.{}
+        else if (container_data.rhs == 0)
+            &.{container_data.lhs}
+        else
+            &.{ container_data.lhs, container_data.rhs },
 
         .container_decl,
         .container_decl_trailing,
@@ -287,7 +287,6 @@ fn printContainer(
     };
 
     for (container_members) |member| {
-        if (member == 0) continue;
         try printTags(member);
     }
 }
