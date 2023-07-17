@@ -95,7 +95,8 @@ fn printTags(index: Node.Index) !void {
 
                 .builtin_call_two => {
                     const init_node_main_token = ast.nodes.items(.main_token)[init_node];
-                    if (mem.eql(u8, ast.tokenSlice(init_node_main_token), "@import")) {
+                    const token_slice = ast.tokenSlice(init_node_main_token);
+                    if (mem.eql(u8, token_slice, "@import") or mem.eql(u8, token_slice, "@cImport")) {
                         try printLine(.{
                             .tag = main_token + 1,
                             .kind = "import",
