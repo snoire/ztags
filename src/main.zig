@@ -117,7 +117,12 @@ fn printTags(index: Node.Index) !void {
             });
         },
 
-        .fn_decl => fn_decl: {
+        .fn_proto_simple,
+        .fn_proto_multi,
+        .fn_proto_one,
+        .fn_proto,
+        .fn_decl,
+        => fn_decl: {
             var buf: [1]Node.Index = undefined;
             const full = ast.fullFnProto(&buf, index).?;
             const public = if (full.visib_token) |_| true else false;
@@ -188,7 +193,10 @@ fn printTags(index: Node.Index) !void {
             });
         },
 
-        .container_field_init => try printLine(.{
+        .container_field_init,
+        .container_field_align,
+        .container_field,
+        => try printLine(.{
             .tag = main_token,
             .kind = "field",
         }),
