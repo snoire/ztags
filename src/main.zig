@@ -12,9 +12,7 @@ var ast: Ast = undefined;
 var stack: ScopeList = undefined;
 var filename: []const u8 = undefined;
 
-const stdout_file = std.io.getStdOut().writer();
-var writer: std.io.BufferedWriter(4096, @TypeOf(stdout_file)).Writer = undefined;
-
+var writer: std.io.BufferedWriter(4096, std.fs.File.Writer).Writer = undefined;
 var allocator: mem.Allocator = undefined;
 
 pub fn main() anyerror!void {
@@ -47,6 +45,7 @@ pub fn main() anyerror!void {
     stack = ScopeList.init(allocator);
     defer stack.deinit();
 
+    const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     writer = bw.writer();
 
